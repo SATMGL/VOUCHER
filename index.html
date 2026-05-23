@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Voucher Generator - Pak Joko</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;700;900&family=Orbitron:wght@700;900&family=Teko:wght@600;700&family=Bebas+Neue&display=swap" rel="stylesheet">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+    font-family: Arial, sans-serif;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+.app-container { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+.main-title {
+    text-align: center; font-size: 18px; font-weight: 900;
+    padding: 5px 0; background: white; text-transform: uppercase;
+    letter-spacing: 3px; box-shadow: 0 2px 10px rgba(0,0,0,0.15); flex-shrink: 0;
+}
+.main-title span {
+    display: inline-block;
+    animation: colorChange 3s ease-in-out infinite, floatAnim 3s ease-in-out infinite;
+    text-shadow: 2px 2px 0 rgba(0,0,0,0.15);
+}
+@keyframes colorChange { 0%,100%{color:#667eea} 25%{color:#f093fb} 50%{color:#4facfe} 75%{color:#43e97b} }
+@keyframes floatAnim { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-4px)} }
+.preview-section {
+    flex: 1; overflow: auto; display: flex;
+    align-items: flex-start; justify-content: center; padding: 10px; min-height: 0;
+}
+.preview-inner { transform-origin: top center; }
+.control-section {
+    background: white; padding: 8px 12px;
+    box-shadow: 0 -3px 12px rgba(0,0,0,0.15); flex-shrink: 0;
+}
+.ctrl-title { text-align: center; font-size: 11px; font-weight: bold; color: #007bff; margin-bottom: 6px; }
+.ctrl-grid { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr 1fr; gap: 6px; margin-bottom: 6px; }
+.ctrl-item label { display: block; font-size: 9px; font-weight: bold; color: #555; margin-bottom: 2px; }
+.ctrl-item input { width: 100%; padding: 5px 6px; border: 1px solid #ccc; border-radius: 4px; font-size: 10px; }
+.ctrl-item input:focus { outline: none; border-color: #007bff; }
+.btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.btn { width: 100%; padding: 7px; border: none; border-radius: 4px; font-size: 11px; font-weight: bold; cursor: pointer; transition: 0.2s; }
+.btn-generate { background: #007bff; color: white; }
+.btn-generate:hover { background: #0056b3; }
+.btn-print { background: #28a745; color: white; }
+.btn-print:hover { background: #1e7e34; }
+.btn-print:disabled { background: #aaa; cursor: not-allowed; }
+.info-bar { text-align: center; font-size: 9px; color: #888; margin-top: 4px; }
+.modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 9999; align-items: center; justify-content: center; }
+.modal-overlay.show { display: flex; }
+.modal-box { background: white; border-radius: 12px; padding: 24px; max-width: 420px; width: 90%; box-shadow: 0 10px 40px rgba(0,0,0,0.3); }
+.modal-box h2 { font-size: 16px; color: #333; margin-bottom: 14px; text-align: center; }
+.modal-steps { list-style: none; margin-bottom: 16px; }
+.modal-steps li { display: flex; align-items: flex-start; gap: 10px; padding: 8px 0; border-bottom: 1px solid #f0f0f0; font-size: 13px; color: #444; }
+.modal-steps li:last-child { border-bottom: none; }
+.step-num { background: #007bff; color: white; border-radius: 50%; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: bold; flex-shrink: 0; }
+.modal-steps strong { color: #007bff; }
+.modal-warn { background: #fff3cd; border: 1px solid #ffc107; border-radius: 6px; padding: 8px 12px; font-size: 12px; color: #856404; margin-bottom: 16px; }
+.modal-btns { display: flex; gap: 8px; }
+.modal-btns button { flex: 1; padding: 10px; border: none; border-radius: 6px; font-size: 13px; font-weight: bold; cursor: pointer; }
+.btn-cancel { background: #f0f0f0; color: #555; }
+.btn-cancel:hover { background: #e0e0e0; }
+.btn-ok { background: #28a745; color: white; }
+.btn-ok:hover { background: #1e7e34; }
+
+/* A4 */
+.a4-page {
+    width: 210mm; height: 297mm; background: white;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.2); box-sizing: border-box;
+    display: grid;
+    grid-template-columns: repeat(5, 40mm);
+    grid-template-rows: repeat(10, 28mm);
+    gap: 1.55mm 1.67mm;
+    justify-content: center;
+    align-content: center;
+    flex-shrink: 0;
+    position: relative;
+}
+.a4-page + .a4-page { margin-top: 10px; }
+
+/* CUTTING GUIDE — garis hanya di antara voucher, bukan keliling masing2 */
+.voucher-wrap {
+    position: relative;
+    display: flex; align-items: stretch;
+}
+/* garis kanan (antar kolom) — semua kecuali kolom ke-5 */
+.voucher-wrap:not(:nth-child(5n))::after {
+    content: '';
+    position: absolute;
+    right: -0.84mm; /* setengah gap horizontal */
+    top: 0; bottom: 0;
+    width: 0;
+    border-right: 0.3mm dashed #bbb;
+}
+/* garis bawah (antar baris) — semua kecuali baris terakhir (41-50) */
+.voucher-wrap:not(:nth-child(n+46))::before {
+    content: '';
+    position: absolute;
+    bottom: -0.78mm; /* setengah gap vertikal */
+    left: 0; right: 0;
+    height: 0;
+    border-bottom: 0.3mm dashed #bbb;
+}
+
+/* VOUCHER — desain single-voucher */
+.voucher {
+    position: relative; overflow: hidden; background: white;
+    border: 0.8mm solid #111; border-radius: 0.5mm;
+    display: flex; flex-direction: column;
+    font-family: 'Barlow Condensed', Arial, sans-serif; flex: 1;
+}
+.voucher::before, .voucher::after {
+    content: ''; position: absolute; width: 1.6mm; height: 1.6mm; z-index: 2; pointer-events: none;
+}
+.voucher::before { top:0.5mm; left:0.5mm; border-top:0.6mm solid #111; border-left:0.6mm solid #111; }
+.voucher::after  { bottom:0.5mm; right:0.5mm; border-bottom:0.6mm solid #111; border-right:0.6mm solid #111; }
+.v-corner-tr, .v-corner-bl { position:absolute; width:2.2mm; height:2.2mm; z-index:2; pointer-events:none; }
+.v-corner-tr { top:0.5mm; right:0.5mm; border-top:0.6mm solid #111; border-right:0.6mm solid #111; }
+.v-corner-bl { bottom:0.5mm; left:0.5mm; border-bottom:0.6mm solid #111; border-left:0.6mm solid #111; }
+
+/* header */
+.v-head {
+    text-align: center; padding: 0 1mm; border-bottom: 0.2mm solid #111;
+    position: relative; z-index:1; flex-shrink: 0; overflow: hidden;
+    height: 6mm; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 0.2mm;
+}
+.v-ssid-box { border: 0.3mm dashed transparent; padding: 0.2mm 1.2mm; width: calc(100% - 3mm); overflow: hidden; box-sizing: border-box; }
+.v-ssid {
+    font-family: 'Orbitron', sans-serif; font-size: 3.5mm; font-weight: 600;
+    letter-spacing: 0.5mm; text-transform: uppercase; line-height: 1;
+    white-space: nowrap; overflow: visible; display: block; width: 100%; text-align: center;
+}
+.v-head-dash { display: block; font-size: 1.2mm; letter-spacing: 0.3mm; color: #777; margin-top: 0.1mm; line-height: 1; }
+
+/* body */
+.v-body { flex: 1; display: grid; grid-template-columns: 7mm 1fr 7mm; overflow: hidden; position: relative; z-index:1; }
+.v-side { display:flex; align-items:center; justify-content:center; overflow:hidden; padding: 1mm 0; }
+.v-side-left  { border-right: 0.2mm solid #111; }
+.v-side-right { border-left: 0.2mm solid #111; background: #111; }
+.v-side span {
+    display: block; white-space: nowrap; font-family: 'Bebas Neue', sans-serif;
+    font-weight: 400; font-size: 3.8mm; letter-spacing: 0.2mm; line-height: 1; color: #111;
+}
+.v-side-left  span { transform: rotate(-90deg); }
+.v-side-right span { transform: rotate(90deg); color: white; }
+
+.v-center {
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: space-between; padding: 0.8mm 1mm 0.5mm;
+    position: relative; min-width: 0; overflow: hidden; width: 100%;
+}
+.v-center::before, .v-center::after {
+    content: ''; position: absolute; width: 1.4mm; height: 1.4mm; z-index: 2; pointer-events: none;
+}
+.v-center::before { top: 0.5mm; left: 0.5mm; border-top: 0.4mm solid #111; border-left: 0.4mm solid #111; }
+.v-center::after  { bottom: 0.5mm; right: 0.5mm; border-bottom: 0.4mm solid #111; border-right: 0.4mm solid #111; }
+.v-center-tr, .v-center-bl { position: absolute; width: 1.4mm; height: 1.4mm; z-index: 2; }
+.v-center-tr { top: 0.5mm; right: 0.5mm; border-top: 0.4mm solid #111; border-right: 0.4mm solid #111; }
+.v-center-bl { bottom: 0.5mm; left: 0.5mm; border-bottom: 0.4mm solid #111; border-left: 0.4mm solid #111; }
+
+.v-label {
+    font-size: 1.8mm; font-weight: 600; letter-spacing: 0.4mm; color: #222;
+    text-transform: uppercase; line-height: 1; display: flex; align-items: center; gap: 0.5mm;
+}
+.v-label::before, .v-label::after { content:'—'; color:#888; font-weight:400; }
+.v-code { flex: 1; display: flex; align-items: center; justify-content: center; overflow: hidden; max-width: 100%; text-align: center; }
+.v-code-inner {
+    font-family: 'Teko', sans-serif; font-size: 6mm; font-weight: 700;
+    letter-spacing: 0.4mm; color: #000; white-space: nowrap; display: inline-block;
+    width: fit-content; padding: 0 0.5mm;
+    border-top: 0.2mm solid #111; border-bottom: 0.2mm solid #111;
+}
+
+/* footer */
+.v-foot {
+    border-top: 0.2mm solid #111; display: flex; align-items: center;
+    justify-content: center; gap: 0.8mm; padding: 0.2mm 1mm; flex-shrink: 0; position: relative; z-index:1;
+    overflow: hidden;
+}
+.v-foot-icon { flex-shrink: 0; }
+.v-foot-icon svg { width:3mm; height:3mm; color:#222; display:block; }
+.v-foot-text { line-height:1.2; text-align:center; }
+.ft-top { font-size:2.2mm; font-weight:600; letter-spacing:0.2mm; text-transform:uppercase; color:#111; }
+.ft-bot { font-size:1.6mm; font-weight:600; letter-spacing:0.2mm; color:#111; text-transform:uppercase; }
+.v-foot-sep { width:0.15mm; height:3.5mm; background:#ccc; flex-shrink:0; }
+
+@media print {
+    @page { size: 210mm 297mm; margin: 0mm; }
+    * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+    html, body { width: 210mm; height: 297mm; background: white !important; overflow: visible; }
+    .app-container { display: block; height: auto; overflow: visible; }
+    .main-title, .control-section, .modal-overlay { display: none !important; }
+    .preview-section { display: block; padding: 0; overflow: visible; height: auto; }
+    .preview-inner { transform: none !important; height: auto !important; }
+    .a4-page { box-shadow: none !important; page-break-after: always; break-after: page; margin: 0 !important; width: 210mm; height: 297mm; }
+    .a4-page + .a4-page { margin-top: 0 !important; }
+    .a4-page:last-child { page-break-after: avoid; break-after: avoid; }
+    .voucher-wrap::after, .voucher-wrap::before { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+    .voucher { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+    .v-side-right { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+}
+</style>
+</head>
+<body>
+<div class="app-container">
+    <h1 class="main-title">
+        <span>G</span><span>E</span><span>N</span><span>E</span><span>R</span><span>A</span><span>T</span><span>O</span><span>R</span>&nbsp;
+        <span>V</span><span>O</span><span>U</span><span>C</span><span>H</span><span>E</span><span>R</span>&nbsp;
+        <span>P</span><span>A</span><span>K</span>&nbsp;
+        <span>J</span><span>O</span><span>K</span><span>O</span>
+    </h1>
+    <div class="preview-section" id="previewSection">
+        <div class="preview-inner" id="previewInner"></div>
+    </div>
+    <div class="control-section">
+        <div class="ctrl-title" id="ctrlTitle">VOUCHER GENERATOR PAK JOKO</div>
+        <div class="ctrl-grid">
+            <div class="ctrl-item">
+                <label>FILE CSV / TXT</label>
+                <input type="file" id="fileInput" accept=".csv,.txt">
+            </div>
+            <div class="ctrl-item">
+                <label>NAMA WIFI (SSID)</label>
+                <input type="text" id="ssidInput" value="BANTERWIFI" placeholder="BANTERWIFI">
+            </div>
+            <div class="ctrl-item">
+                <label>HARGA (Rp)</label>
+                <input type="text" id="hargaInput" placeholder="10.000" oninput="formatRupiah(this)">
+            </div>
+            <div class="ctrl-item">
+                <label>TAGLINE ATAS</label>
+                <input type="text" id="taglineTop" value="High Speed" placeholder="High Speed">
+            </div>
+            <div class="ctrl-item">
+                <label>TAGLINE BAWAH</label>
+                <input type="text" id="taglineBot" value="Low Budget" placeholder="Low Budget">
+            </div>
+        </div>
+        <div class="btn-row">
+            <button class="btn btn-generate" onclick="generate()">GENERATE VOUCHER</button>
+            <button class="btn btn-print" id="printBtn" onclick="showPrintGuide()" disabled>PRINT / SAVE PDF</button>
+        </div>
+        <div class="info-bar" id="infoBar">Upload file CSV/TXT dari MikroTik lalu klik GENERATE</div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="printModal">
+    <div class="modal-box">
+        <h2>Panduan Print agar Pas A4</h2>
+        <div class="modal-warn">Jika margin dan scale tidak diatur, hasil cetak akan terpotong atau tidak pas!</div>
+        <ul class="modal-steps">
+            <li><div class="step-num">1</div><div>Cari <strong>More settings</strong> / <strong>Pengaturan Lanjutan</strong></div></li>
+            <li><div class="step-num">2</div><div>Set <strong>Margins</strong> ke <strong>None / 0</strong></div></li>
+            <li><div class="step-num">3</div><div>Set <strong>Scale</strong> ke <strong>100%</strong> (bukan Fit to page)</div></li>
+            <li><div class="step-num">4</div><div>Ukuran kertas = <strong>A4</strong>, orientasi = <strong>Portrait</strong></div></li>
+            <li><div class="step-num">5</div><div>Klik <strong>Print / Save as PDF</strong></div></li>
+        </ul>
+        <div class="modal-btns">
+            <button class="btn-cancel" onclick="closeModal()">Batal</button>
+            <button class="btn-ok" onclick="doPrint()">Mengerti, Lanjut Print</button>
+        </div>
+    </div>
+</div>
+
+<script>
+let voucherData = [];
+
+function scalePreview() {
+    const section = document.getElementById('previewSection');
+    const inner   = document.getElementById('previewInner');
+    const pages   = inner.querySelectorAll('.a4-page');
+    if (!pages.length) return;
+
+    // reset transform dulu supaya getBoundingClientRect akurat
+    inner.style.transform = 'scale(1)';
+    const pageEl = pages[0];
+    const rect   = pageEl.getBoundingClientRect();
+
+    // fit lebar layar, maksimal 1 (ukuran cetak asli)
+    const availW = section.clientWidth - 16;
+    const scale  = Math.min(availW / rect.width, 1);
+
+    inner.style.transform = 'scale(' + scale + ')';
+    inner.style.height = ((rect.height * scale + 10) * pages.length) + 'px';
+}
+window.addEventListener('resize', scalePreview);
+
+function formatRupiah(el) {
+    const raw = el.value.replace(/\D/g, '');
+    el.value  = raw.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+}
+
+function parseUptime(raw) {
+    raw = (raw || '').trim();
+    const wk = raw.match(/(\d+)w/i);
+    const dy = raw.match(/(\d+)d/i);
+    const hr = raw.match(/(\d+)h/i);
+    const mn = raw.match(/(\d+)m/i);
+    const totalHari = (wk ? parseInt(wk[1])*7 : 0) + (dy ? parseInt(dy[1]) : 0);
+    const parts = [];
+    if (totalHari > 0) parts.push(totalHari + ' Hari');
+    if (hr) parts.push(parseInt(hr[1]) + ' Jam');
+    if (mn) parts.push(parseInt(mn[1]) + ' Mnt');
+    return parts.join(' ') || '-';
+}
+
+function parseFile(text) {
+    const list  = [];
+    const lines = text.split('\n');
+
+    // deteksi format: CSV (ada header Username) atau MikroTik script (ada keyword add)
+    const firstLine = lines.find(function(l) { return l.trim().length > 0; }) || '';
+    const isCSV = firstLine.toLowerCase().includes('username') ||
+                  (firstLine.includes(',') && !firstLine.toLowerCase().includes('add'));
+
+    if (isCSV) {
+        // Format CSV: Username,Password,Profile,Time Limit,Data Limit,Comment
+        let headerFound = false;
+        let colCode = 0, colUptime = 3;
+        lines.forEach(function(line) {
+            line = line.trim();
+            if (!line) return;
+            if (!headerFound && line.toLowerCase().includes('username')) {
+                headerFound = true;
+                const cols = line.split(',').map(function(c){ return c.trim().toLowerCase(); });
+                const ci = cols.indexOf('username');
+                const ui = cols.indexOf('time limit');
+                if (ci >= 0) colCode   = ci;
+                if (ui >= 0) colUptime = ui;
+                return;
+            }
+            if (!headerFound) return;
+            const cols = line.split(',');
+            if (cols.length < 2) return;
+            const code   = (cols[colCode]   || '').trim();
+            const uptime = parseUptime((cols[colUptime] || '').trim());
+            if (code) list.push({ code: code, uptime: uptime });
+        });
+    } else {
+        // Format MikroTik script: add name="..." limit-uptime="..."
+        lines.forEach(function(line) {
+            line = line.trim();
+            if (!line.toLowerCase().includes('add')) return;
+            const nm = line.match(/name="([^"]+)"/i);
+            const ut = line.match(/limit-uptime="?([^"\s]+)"?/i);
+            if (!nm) return;
+            list.push({ code: nm[1], uptime: parseUptime(ut ? ut[1] : '') });
+        });
+    }
+
+    return list;
+}
+
+function escHtml(str) {
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function buatVoucher(v, ssid, harga, tagTop, tagBot) {
+    return '<div class="voucher-wrap">' +
+        '<div class="voucher">' +
+            '<div class="v-corner-tr"></div>' +
+            '<div class="v-corner-bl"></div>' +
+            '<div class="v-head">' +
+                '<div class="v-ssid-box"><div class="v-ssid">' + escHtml(ssid) + '</div></div>' +
+            '</div>' +
+            '<div class="v-body">' +
+                '<div class="v-side v-side-left"><span>' + escHtml(v.uptime) + '</span></div>' +
+                '<div class="v-center">' +
+                    '<div class="v-center-tr"></div>' +
+                    '<div class="v-center-bl"></div>' +
+                    '<div class="v-label">Kode Voucher</div>' +
+                    '<div class="v-code"><span class="v-code-inner">' + escHtml(v.code) + '</span></div>' +
+                '</div>' +
+                '<div class="v-side v-side-right"><span>' + escHtml(harga) + '</span></div>' +
+            '</div>' +
+            '<div class="v-foot">' +
+                '<div class="v-foot-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><circle cx="12" cy="20" r="1" fill="currentColor" stroke="none"/></svg></div>' +
+                '<div class="v-foot-text"><div class="ft-top">' + escHtml(tagTop) + '</div><div class="ft-bot">' + escHtml(tagBot) + '</div></div>' +
+                '<div class="v-foot-icon"><svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M13 2L3 14h8l-1 8 10-12h-8l1-8z"/></svg></div>' +
+            '</div>' +
+        '</div>' +
+    '</div>';
+}
+
+function autoShrinkSSID(el) {
+    const box    = el.parentElement;
+    const availW = box.clientWidth - 4;
+    el.style.fontSize = '';
+    void el.offsetWidth;
+    let fs = parseFloat(getComputedStyle(el).fontSize);
+    const minFS = fs * 0.3;
+    while (el.scrollWidth > availW && fs > minFS) {
+        fs -= 0.5;
+        el.style.fontSize = fs + 'px';
+        void el.offsetWidth;
+    }
+}
+
+function autoShrinkSide(el) {
+    const voucher = el.closest('.voucher');
+    const vH      = voucher.clientHeight;
+    const maxFS   = vH * 3.8 / 28;
+    const minFS   = vH * 2.0 / 28;
+    const padding = vH * 2   / 28;
+    const availH  = el.parentElement.clientHeight - padding;
+
+    el.style.transform = 'none';
+    el.style.fontSize  = maxFS + 'px';
+    void el.offsetWidth;
+
+    while (el.scrollWidth > availH && parseFloat(el.style.fontSize) > minFS) {
+        el.style.fontSize = (parseFloat(el.style.fontSize) - 0.3) + 'px';
+        void el.offsetWidth;
+    }
+
+    const isLeft = el.parentElement.classList.contains('v-side-left');
+    el.style.transform = isLeft ? 'rotate(-90deg)' : 'rotate(90deg)';
+}
+
+function autoShrinkCode(el) {
+    const vcode  = el.parentElement;
+    el.style.fontSize = '';
+    void el.offsetWidth;
+    const availW = vcode.clientWidth - 4;
+    let fs = parseFloat(getComputedStyle(el).fontSize);
+    const minFS = fs * 0.4;
+    while (el.scrollWidth > availW && fs > minFS) {
+        fs -= 0.5;
+        el.style.fontSize = fs + 'px';
+        void el.offsetWidth;
+    }
+}
+
+function renderPages(vouchers, ssid, harga, tagTop, tagBot) {
+    const inner = document.getElementById('previewInner');
+    inner.innerHTML = '';
+    inner.style.height = '';
+    const PER   = 50;
+    const total = Math.ceil(vouchers.length / PER);
+    for (var p = 0; p < total; p++) {
+        const div = document.createElement('div');
+        div.className = 'a4-page';
+        div.innerHTML = vouchers.slice(p * PER, (p+1) * PER)
+            .map(function(v) { return buatVoucher(v, ssid, harga, tagTop, tagBot); }).join('');
+        inner.appendChild(div);
+    }
+    setTimeout(function() {
+        scalePreview();
+        document.querySelectorAll('.v-ssid').forEach(function(el) { autoShrinkSSID(el); });
+        document.querySelectorAll('.v-code-inner').forEach(function(el) { autoShrinkCode(el); });
+        document.querySelectorAll('.v-side-left span, .v-side-right span').forEach(function(el) { autoShrinkSide(el); });
+    }, 60);
+    return total;
+}
+
+function generate() {
+    const file   = document.getElementById('fileInput').files[0];
+    const ssid   = document.getElementById('ssidInput').value.trim() || 'WIFI';
+    const raw    = document.getElementById('hargaInput').value.trim();
+    const harga  = raw ? 'Rp ' + raw : 'Rp 0';
+    const tagTop = document.getElementById('taglineTop').value.trim() || 'High Speed';
+    const tagBot = document.getElementById('taglineBot').value.trim() || 'Low Budget';
+    if (!file) { alert('Pilih file CSV/TXT dulu!'); return; }
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        voucherData = parseFile(e.target.result);
+        if (!voucherData.length) {
+            alert('Tidak ada voucher valid!\nFormat: add name="..." limit-uptime="..."');
+            return;
+        }
+        const total = renderPages(voucherData, ssid, harga, tagTop, tagBot);
+        document.getElementById('printBtn').disabled = false;
+        document.getElementById('ctrlTitle').textContent =
+            voucherData.length + ' VOUCHER - ' + total + ' HALAMAN A4 (50 voucher/halaman)';
+        document.getElementById('infoBar').textContent =
+            '5 kolom x 10 baris = 50 voucher/halaman - garis putus-putus = batas potong';
+    };
+    reader.readAsText(file);
+}
+
+function showPrintGuide() { document.getElementById('printModal').classList.add('show'); }
+function closeModal()     { document.getElementById('printModal').classList.remove('show'); }
+function doPrint()        { closeModal(); setTimeout(function() { window.print(); }, 200); }
+
+(function() {
+    const sample = Array.from({length: 50}, function(_,i) {
+        return { code: 'CONTOH-' + (i+1), uptime: '?? Hari' };
+    });
+    renderPages(sample, 'NAMA-WIFI', 'Rp ???', 'High Speed', 'Low Budget');
+    setTimeout(scalePreview, 100);
+})();
+</script>
+</body>
+</html>
